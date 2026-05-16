@@ -21,6 +21,10 @@ export type Card = {
   ninety_nine_eligible: boolean;
   commander_eligible: boolean;
   layout: string;
+  power: string | null;
+  toughness: string | null;
+  loyalty: string | null;
+  released_at: string | null;
 };
 
 export type DeckSlot = { name: string; count: number };

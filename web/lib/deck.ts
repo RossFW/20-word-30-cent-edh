@@ -138,3 +138,98 @@ export function exportText(deck: Deck): string {
   }
   return lines.join("\n");
 }
+
+// ─── URL sharing ────────────────────────────────────────────
+// Encoded as URL-safe base64 of the JSON deck. Compact enough for 100-card decks.
+// For a typical deck this is ~3-4 KB → ~5 KB URL after encoding. Within all
+// browser/server limits.
+
+const URL_SAFE = (s: string) => s.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+const URL_UNSAFE = (s: string) => s.replace(/-/g, "+").replace(/_/g, "/");
+
+export function encodeDeckHash(deck: Deck): string {
+  const json = JSON.stringify(deck);
+  if (typeof window === "undefined") return "";
+  return URL_SAFE(btoa(unescape(encodeURIComponent(json))));
+}
+
+export function decodeDeckHash(hash: string): Deck | null {
+  try {
+    const cleaned = hash.replace(/^#?d=/, "").trim();
+    if (!cleaned) return null;
+    const padded = URL_UNSAFE(cleaned) + "===".slice((cleaned.length + 3) % 4);
+    const json = decodeURIComponent(escape(atob(padded)));
+    const parsed = JSON.parse(json);
+    if (typeof parsed !== "object" || !Array.isArray(parsed.ninety_nine)) return null;
+    return parsed as Deck;
+  } catch {
+    return null;
+  }
+}
+
+// ─── Decklist text import ───────────────────────────────────
+// Accepts common formats:
+//   "1 Lightning Bolt"
+//   "1x Lightning Bolt"
+//   "1 Lightning Bolt (M11) 149"
+//   "Lightning Bolt"           (count defaults to 1)
+//   "// Commander" or "Commander:" or "*CMDR*" markers
+//   "// Sideboard" markers are ignored — pure 100-card EDH lists
+
+const COUNT_LINE = /^\s*(\d+)\s*[xX]?\s+(.+?)\s*(?:\([^)]+\)\s*\S*)?\s*(\*CMDR\*|\*Commander\*)?\s*$/;
+const COMMANDER_HEADER = /^(?:\/\/\s*commander|commander:)/i;
+const SIDEBOARD_HEADER = /^(?:\/\/\s*sideboard|sideboard:)/i;
+
+export type ParsedDeck = {
+  deck: Deck;
+  unknown: string[];
+  warnings: string[];
+};
+
+export function parseDecklistText(text: string, byName: Map<string, Card>): ParsedDeck {
+  const lines = text.split(/\r?\n/);
+  const ninety_nine: DeckSlot[] = [];
+  let commander: string | null = null;
+  const unknown: string[] = [];
+  const warnings: string[] = [];
+
+  let mode: "main" | "commander" | "sideboard" = "main";
+  // Build a lowercase lookup for fuzzy matching.
+  const lc = new Map<string, string>();
+  for (const k of byName.keys()) lc.set(k.toLowerCase(), k);
+
+  for (const raw of lines) {
+    const line = raw.trim();
+    if (!line || line.startsWith("//") === false && line.startsWith("#")) continue;
+    if (COMMANDER_HEADER.test(line)) { mode = "commander"; continue; }
+    if (SIDEBOARD_HEADER.test(line)) { mode = "sideboard"; continue; }
+    if (line.startsWith("//")) {
+      // unknown comment — skip
+      continue;
+    }
+
+    const m = COUNT_LINE.exec(line);
+    if (!m) {
+      warnings.push(`Couldn't parse: "${line}"`);
+      continue;
+    }
+    const count = Math.max(1, parseInt(m[1], 10) || 1);
+    const rawName = m[2].trim();
+    const isCommanderMarker = !!m[3];
+    const canonical = byName.has(rawName) ? rawName : lc.get(rawName.toLowerCase()) ?? null;
+    if (!canonical) {
+      unknown.push(rawName);
+      continue;
+    }
+    if (mode === "commander" || isCommanderMarker) {
+      commander = canonical;
+      continue;
+    }
+    if (mode === "sideboard") continue;
+    const existing = ninety_nine.find((s) => s.name === canonical);
+    if (existing) existing.count += count;
+    else ninety_nine.push({ name: canonical, count });
+  }
+
+  return { deck: { commander, ninety_nine }, unknown, warnings };
+}

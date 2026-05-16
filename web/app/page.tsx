@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
-import { loadCards, applyFilters, EMPTY_FILTERS, type Filters } from "@/lib/cards";
+import { loadCards, applyFilters, EMPTY_FILTERS, topKeywords, type Filters } from "@/lib/cards";
 import type { Card } from "@/lib/types";
 import { FiltersPanel } from "@/components/Filters";
 import { CardTile } from "@/components/CardTile";
@@ -21,11 +21,13 @@ export default function BrowsePage() {
     return applyFilters(cards, filters);
   }, [cards, filters]);
 
+  const keywords = useMemo(() => (cards ? topKeywords(cards, 40) : []), [cards]);
+
   useEffect(() => setVisible(PAGE_SIZE), [filters]);
 
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-[320px_1fr]">
-      <FiltersPanel filters={filters} setFilters={setFilters} />
+      <FiltersPanel filters={filters} setFilters={setFilters} availableKeywords={keywords} />
       <div>
         <div className="mb-3 flex items-baseline justify-between text-sm text-white/70">
           <span>

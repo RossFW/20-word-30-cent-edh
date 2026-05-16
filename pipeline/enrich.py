@@ -194,6 +194,12 @@ def main() -> None:
         if not image and "card_faces" in chosen:
             image = (chosen["card_faces"][0].get("image_uris") or {}).get("normal")
 
+        # P/T/loyalty live on either the top-level card or the front face.
+        front = (chosen.get("card_faces") or [{}])[0] if chosen.get("card_faces") else {}
+        power = chosen.get("power") or front.get("power")
+        toughness = chosen.get("toughness") or front.get("toughness")
+        loyalty = chosen.get("loyalty") or front.get("loyalty")
+
         cards.append({
             "name": chosen.get("name"),
             "oracle_text": oracle,
@@ -219,6 +225,10 @@ def main() -> None:
             "ninety_nine_eligible": ninety_nine_eligible,
             "commander_eligible": commander_eligible,
             "layout": chosen.get("layout"),
+            "power": power,
+            "toughness": toughness,
+            "loyalty": loyalty,
+            "released_at": chosen.get("released_at"),
         })
 
     cards.sort(key=lambda c: c["name"])
