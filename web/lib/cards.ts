@@ -6,7 +6,10 @@ const ASSET_PREFIX = process.env.NEXT_PUBLIC_BASE_PATH || "";
 
 export async function loadCards(): Promise<Card[]> {
   if (cache) return cache;
-  const res = await fetch(`${ASSET_PREFIX}/cards.json`, { cache: "force-cache" });
+  // "no-cache" forces the browser to revalidate with the server via ETag/If-None-Match.
+  // Without this, after a nightly data refresh the user's browser may serve a stale
+  // cards.json from disk cache and miss newly-added fields (e.g. edhrec_rank).
+  const res = await fetch(`${ASSET_PREFIX}/cards.json`, { cache: "no-cache" });
   if (!res.ok) throw new Error(`failed to load cards.json (${res.status})`);
   cache = (await res.json()) as Card[];
   return cache;
