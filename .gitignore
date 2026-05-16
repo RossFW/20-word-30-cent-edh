@@ -23,3 +23,6 @@ web/.env*.local
 # Editor noise
 .vscode/
 .idea/
+
+# Local screenshots from the visual-review skill
+.playwright-cli/
